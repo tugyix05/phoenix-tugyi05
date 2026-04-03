@@ -1,1 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phoenix Tugyi Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* Dark Mode & Glassmorphism Design */
+        body { 
+            background-color: #050505; 
+            color: #f5f5f5; 
+            font-family: 'Inter', sans-serif; 
+        }
+        .glass-card { 
+            background: rgba(20, 20, 20, 0.7); 
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 100, 0, 0.15); 
+        }
+        .btn-glow { 
+            box-shadow: 0 0 20px rgba(255, 100, 0, 0.25); 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6 selection:bg-orange-500/30">
+    <div class="max-w-md w-full glass-card rounded-[2.5rem] p-10 text-center shadow-2xl animate-in fade-in zoom-in duration-500">
+        
+        <div class="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-500/20 shadow-inner">
+            <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+            </svg>
+        </div>
 
+        <h1 class="text-2xl font-black tracking-tighter uppercase text-white mb-1">Phoenix Tugyi</h1>
+        <p class="text-gray-500 text-[10px] tracking-[0.3em] mb-10 uppercase font-medium">WireGuard Generator v1.0</p>
+
+        <button id="genBtn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-5 rounded-2xl transition-all btn-glow uppercase text-sm tracking-widest mb-8 active:scale-[0.98] disabled:opacity-50">
+            Generate New Config
+        </button>
+
+        <div id="resultArea" class="hidden space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div class="bg-white p-5 rounded-[2rem] inline-block shadow-2xl border-4 border-orange-500/10">
+                <div id="qrcode"></div>
+            </div>
+            
+            <button id="dlBtn" class="w-full border border-orange-500/20 text-orange-500 hover:bg-orange-500/10 py-4 rounded-2xl transition-all uppercase text-xs font-bold tracking-widest flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Download .conf
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = "";
+        const genBtn = document.getElementById('genBtn');
+        const qrcodeDiv = document.getElementById('qrcode');
+
+        genBtn.onclick = async () => {
+            genBtn.disabled = true;
+            genBtn.innerText = "Registering Key...";
+            
+            try {
+                // Modified to use the clean redirect path
+                const res = await fetch('/api/generate');
+                
+                if (!res.ok) throw new Error('Generation failed');
+                
+                const data = await res.json();
+                currentConfig = data.config;
+
+                // Generate QR Code
+                qrcodeDiv.innerHTML = "";
+                new QRCode(qrcodeDiv, { 
+                    text: currentConfig, 
+                    width: 220, 
+                    height: 220, 
+                    colorDark: "#000000",
+                    correctLevel: QRCode.CorrectLevel.M 
+                });
+
+                document.getElementById('resultArea').classList.remove('hidden');
+                
+            } catch (e) {
+                alert("Error: Could not connect to the generator. Please check your internet.");
+            } finally {
+                genBtn.disabled = false;
+                genBtn.innerText = "Generate New Config";
+            }
+        };
+
+        // Download Logic (Standard .conf file)
+        document.getElementById('dlBtn').onclick = () => {
+            if(!currentConfig) return;
+            const blob = new Blob([currentConfig], { type: 'application/x-wireguard-config' });
+            const a = document.body.appendChild(document.createElement('a'));
+            a.href = URL.createObjectURL(blob);
+            a.download = 'phoenix_tugyi.conf';
+            a.click();
+            a.remove();
+        };
+    </script>
+</body>
+</html>
