@@ -13,7 +13,7 @@ exports.handler = async function (event) {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
-    // ၁။ Cloudflare KeyPair ထုတ်ယူခြင်း
+    // ၁။ Cloudflare KeyPair ထုတ်ယူခြင်း (ပထမဆုံးအတိုင်း မူလ Logic)
     const { privateKey, publicKey } = crypto.generateKeyPairSync("x25519");
     const priv = privateKey.export({ format: "der", type: "pkcs8" }).subarray(16).toString("base64");
     const pub  = publicKey.export({ format: "der", type: "spki" }).subarray(12).toString("base64");
@@ -29,22 +29,26 @@ exports.handler = async function (event) {
       }),
     });
 
+    // Cloudflare API မရမှသာ Error ပြမည်
     if (!warpRes.ok) throw new Error("Cloudflare Failed");
     const data = await warpRes.json();
 
-    // ၂။ Global Counter ကို Upstash တွင် +1 တိုးခြင်း
-    let globalCount = 1; 
+    // ၂။ Global Counter (Upstash) - ဒီအပိုင်းမှာ Error တက်ရင်လည်း Config ကို ဆက်ထုတ်ပေးမည်
+    let globalCount = "..."; 
     try {
       const redisRes = await fetch(`${UPSTASH_URL}/incr/phx_global_count`, {
-        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+        signal: AbortSignal.timeout(3000) // ၃ စက္ကန့်အတွင်း အကြောင်းမပြန်ရင် ကျော်သွားမည်
       });
-      const redisData = await redisRes.json();
-      globalCount = redisData.result; 
+      if (redisRes.ok) {
+        const redisData = await redisRes.json();
+        globalCount = redisData.result;
+      }
     } catch (e) {
-      console.error("Redis Error:", e);
+      console.log("Counter Error (Skipped):", e.message);
+      // Counter အလုပ်မလုပ်ရင် လက်ရှိ localStorage က နံပါတ်ကိုပဲ သုံးဖို့ placeholder ထားနိုင်သည်
     }
 
-    // ၃။ မူလ DNS နှင့် Endpoint Logic (ဘာမှမပြောင်းလဲထားပါ)
     const configStr = `[Interface]
 PrivateKey = ${priv}
 Address = ${data.config.interface.addresses.v4}/32
@@ -56,7 +60,7 @@ MTU = 1280
 PublicKey = ${data.config.peers[0].public_key}
 AllowedIPs = 0.0.0.0/0
 AllowedIPs = ::/0
-Endpoint = 162.159.192.2:500
+Endpoint = 162.159.192.1:500
 PersistentKeepalive = 20`;
 
     return { 
@@ -65,6 +69,7 @@ PersistentKeepalive = 20`;
       body: JSON.stringify({ config: configStr, count: globalCount }) 
     };
   } catch (err) {
-    return { statusCode: 500, headers, body: JSON.stringify({ message: "API Busy" }) };
+    // ဤနေရာတွင် Error ပေါ်လာပါက Cloudflare ဘက်က အလုပ်မလုပ်ခြင်းသာ ဖြစ်သည်
+    return { statusCode: 500, headers, body: JSON.stringify({ message: "Cloudflare Server Busy" }) };
   }
 };
