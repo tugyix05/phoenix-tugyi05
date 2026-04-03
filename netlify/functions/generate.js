@@ -1,15 +1,24 @@
 const crypto = require("crypto");
 
+// Upstash Configuration
+const UPSTASH_URL = "https://current-duck-66376.upstash.io";
+const UPSTASH_TOKEN = "gQAAAAAAAQNIAAIncDFkYjI2NDBmNTJhN2Q0Nzk4OGYzZDBlNjg0NDExODQ0N3AxNjYzNzY"; 
+
 exports.handler = async function (event) {
-  const headers = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+  const headers = { 
+    "Access-Control-Allow-Origin": "*", 
+    "Content-Type": "application/json" 
+  };
+
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
+    // ၁။ Cloudflare KeyPair ထုတ်ယူခြင်း
     const { privateKey, publicKey } = crypto.generateKeyPairSync("x25519");
     const priv = privateKey.export({ format: "der", type: "pkcs8" }).subarray(16).toString("base64");
     const pub  = publicKey.export({ format: "der", type: "spki" }).subarray(12).toString("base64");
-
     const installId = crypto.randomBytes(11).toString("hex");
+
     const warpRes = await fetch("https://api.cloudflareclient.com/v0a884/reg", {
       method: "POST",
       headers: { "User-Agent": "okhttp/3.12.1", "Content-Type": "application/json; charset=UTF-8" },
@@ -20,9 +29,22 @@ exports.handler = async function (event) {
       }),
     });
 
-    if (!warpRes.ok) throw new Error("Cloudflare Registration Failed");
-
+    if (!warpRes.ok) throw new Error("Cloudflare Failed");
     const data = await warpRes.json();
+
+    // ၂။ Global Counter ကို Upstash တွင် +1 တိုးခြင်း
+    let globalCount = 1; 
+    try {
+      const redisRes = await fetch(`${UPSTASH_URL}/incr/phx_global_count`, {
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
+      });
+      const redisData = await redisRes.json();
+      globalCount = redisData.result; 
+    } catch (e) {
+      console.error("Redis Error:", e);
+    }
+
+    // ၃။ မူလ DNS နှင့် Endpoint Logic (ဘာမှမပြောင်းလဲထားပါ)
     const configStr = `[Interface]
 PrivateKey = ${priv}
 Address = ${data.config.interface.addresses.v4}/32
@@ -37,9 +59,12 @@ AllowedIPs = ::/0
 Endpoint = 162.159.192.1:500
 PersistentKeepalive = 20`;
 
-    return { statusCode: 200, headers, body: JSON.stringify({ config: configStr }) };
+    return { 
+      statusCode: 200, 
+      headers, 
+      body: JSON.stringify({ config: configStr, count: globalCount }) 
+    };
   } catch (err) {
-    // API Busy ဖြစ်ရင် Error Status 500 ပို့ပေးလိုက်ခြင်း
     return { statusCode: 500, headers, body: JSON.stringify({ message: "API Busy" }) };
   }
 };
