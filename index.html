@@ -10,43 +10,64 @@
         body { background-color: #050505; color: #f5f5f5; font-family: 'Inter', sans-serif; }
         .glass-card { background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 100, 0, 0.15); }
         .btn-glow { box-shadow: 0 0 20px rgba(255, 100, 0, 0.25); }
+        .counter-badge { background: rgba(255, 100, 0, 0.1); border: 1px solid rgba(255, 100, 0, 0.2); color: #f97316; }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-6">
-    <div class="max-w-md w-full glass-card rounded-[2.5rem] p-10 text-center shadow-2xl animate-in fade-in zoom-in duration-500">
-        <div class="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-500/20">
-            <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+    <div class="max-w-md w-full glass-card rounded-[2.5rem] p-10 text-center shadow-2xl">
+        
+        <div id="mainPage">
+            <div class="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-500/20">
+                <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </div>
+            <h1 class="text-2xl font-black tracking-tighter uppercase text-white mb-1">Phoenix Tugyi</h1>
+            
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full counter-badge text-[10px] font-bold uppercase tracking-widest mb-10">
+                <span>Configs Generated:</span>
+                <span id="displayCount" class="text-white">0</span>
+            </div>
+
+            <button id="genBtn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-5 rounded-2xl transition-all btn-glow uppercase text-sm tracking-widest active:scale-[0.98] disabled:opacity-50">
+                Generate New Config
+            </button>
+            <p id="errorMsg" class="hidden text-red-500 text-[11px] mt-4 font-medium italic animate-pulse">API Busy! Please wait a moment and try again.</p>
         </div>
-        <h1 class="text-2xl font-black tracking-tighter uppercase text-white mb-1">Phoenix Tugyi</h1>
-        <p class="text-gray-500 text-[10px] tracking-[0.3em] mb-10 uppercase font-medium">WireGuard Generator v1.0</p>
 
-        <button id="genBtn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-5 rounded-2xl transition-all btn-glow uppercase text-sm tracking-widest mb-4 active:scale-[0.98] disabled:opacity-50">
-            Generate New Config
-        </button>
-        <p id="errorMsg" class="hidden text-red-500 text-[11px] mb-4 font-medium italic animate-pulse">API Busy! Please wait a moment and try again.</p>
-
-        <div id="resultArea" class="hidden space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div id="resultArea" class="hidden space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div class="bg-white p-5 rounded-[2rem] inline-block shadow-2xl border-4 border-orange-500/10">
                 <div id="qrcode"></div>
             </div>
-            <button id="dlBtn" class="w-full border border-orange-500/20 text-orange-500 hover:bg-orange-500/10 py-4 rounded-2xl transition-all uppercase text-xs font-bold tracking-widest flex items-center justify-center gap-2">
-                Download .conf
-            </button>
+            
+            <div class="space-y-3">
+                <button id="dlBtn" class="w-full bg-white/5 border border-orange-500/20 text-orange-500 hover:bg-orange-500/10 py-4 rounded-2xl transition-all uppercase text-xs font-bold tracking-widest flex items-center justify-center gap-2">
+                    Download .conf
+                </button>
+                
+                <button id="backBtn" class="w-full text-gray-500 hover:text-gray-300 py-2 text-[10px] uppercase tracking-[0.2em] transition-all font-bold">
+                    ← Generate Another
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
         let currentConfig = "";
+        let configCount = parseInt(localStorage.getItem('phx_count') || '0');
+        
+        const mainPage = document.getElementById('mainPage');
+        const resultArea = document.getElementById('resultArea');
         const genBtn = document.getElementById('genBtn');
         const errorMsg = document.getElementById('errorMsg');
         const qrcodeDiv = document.getElementById('qrcode');
-        const resultArea = document.getElementById('resultArea');
+        const displayCount = document.getElementById('displayCount');
+
+        // Initial count display
+        displayCount.innerText = configCount;
 
         genBtn.onclick = async () => {
             genBtn.disabled = true;
             genBtn.innerText = "Registering...";
             errorMsg.classList.add('hidden');
-            resultArea.classList.add('hidden');
             
             try {
                 const res = await fetch('/api/generate');
@@ -54,9 +75,19 @@
                 
                 const data = await res.json();
                 currentConfig = data.config;
+                
+                // Count update logic
+                configCount++;
+                localStorage.setItem('phx_count', configCount);
+                displayCount.innerText = configCount;
 
                 qrcodeDiv.innerHTML = "";
-                new QRCode(qrcodeDiv, { text: currentConfig, width: 220, height: 220, colorDark: "#000000" });
+                new QRCode(qrcodeDiv, { 
+                    text: currentConfig, width: 260, height: 260, 
+                    colorDark: "#000000", correctLevel: QRCode.CorrectLevel.H 
+                });
+
+                mainPage.classList.add('hidden');
                 resultArea.classList.remove('hidden');
             } catch (e) {
                 errorMsg.classList.remove('hidden');
@@ -66,12 +97,28 @@
             }
         };
 
+        document.getElementById('backBtn').onclick = () => {
+            resultArea.classList.add('hidden');
+            mainPage.classList.remove('hidden');
+        };
+
         document.getElementById('dlBtn').onclick = () => {
-            const blob = new Blob([currentConfig], { type: 'text/plain' });
+            if(!currentConfig) return;
+            
+            const blob = new Blob([currentConfig], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'phoenix_tugyi.conf';
+            
+            a.href = url;
+            a.download = `Phoenix_${configCount}.conf`;
+            
+            document.body.appendChild(a);
             a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
         };
     </script>
 </body>
