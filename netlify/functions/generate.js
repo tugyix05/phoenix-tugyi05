@@ -56,7 +56,7 @@ MTU = 1280
 PublicKey = ${data.config.peers[0].public_key}
 AllowedIPs = 0.0.0.0/0
 AllowedIPs = ::/0
-Endpoint = 162.159.192.1:500
+Endpoint = 162.159.192.2:500
 PersistentKeepalive = 20`;
 
     return { 
