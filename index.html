@@ -1,61 +1,15 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phoenix Tugyi Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <style>
-        body { background-color: #050505; color: #f5f5f5; font-family: 'Inter', sans-serif; }
-        .glass-card { background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 100, 0, 0.15); }
-        .btn-glow { box-shadow: 0 0 20px rgba(255, 100, 0, 0.25); }
-        .counter-badge { background: rgba(255, 100, 0, 0.1); border: 1px solid rgba(255, 100, 0, 0.2); color: #f97316; }
-        #qrcode img { margin: 0 auto; border-radius: 1.5rem; }
-    </style>
-</head>
-<body class="min-h-screen flex items-center justify-center p-6 text-center">
-    <div class="max-w-md w-full glass-card rounded-[2.5rem] p-8 sm:p-10 shadow-2xl">
-        
-        <div id="mainPage" class="flex flex-col items-center">
-            <div class="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-6 border border-orange-500/20 shadow-inner">
-                <svg class="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            </div>
-            <h1 class="text-2xl font-black tracking-tighter uppercase text-white mb-1">Phoenix Tugyi</h1>
-            
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full counter-badge text-[10px] font-bold uppercase tracking-widest mb-10">
-                <span>Total Global Configs:</span>
-                <span id="displayCount" class="text-white">...</span>
-            </div>
-
-            <button id="genBtn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-5 rounded-2xl transition-all btn-glow uppercase text-sm tracking-widest active:scale-[0.98] disabled:opacity-50">
-                Generate New Config
-            </button>
-            <p id="errorMsg" class="hidden text-red-500 text-[11px] mt-4 font-medium italic animate-pulse uppercase">API Busy! Try Again</p>
-        </div>
-
-        <div id="resultArea" class="hidden flex flex-col items-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div class="bg-white p-4 rounded-[2rem] shadow-2xl border-4 border-orange-500/10 inline-block">
-                <div id="qrcode"></div>
-            </div>
-            
-            <div class="w-full space-y-4">
-                <button id="dlBtn" class="w-full bg-white/5 border border-orange-500/20 text-orange-500 hover:bg-orange-500/10 py-4 rounded-2xl transition-all uppercase text-xs font-bold tracking-widest flex items-center justify-center gap-2">
-                    Download .conf
-                </button>
-                <button id="backBtn" class="w-full text-gray-500 hover:text-gray-300 py-2 text-[10px] uppercase tracking-[0.2em] font-bold">← Generate Another</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
+<script>
         let currentConfig = "";
-        let currentCount = 0;
+        const mainPage = document.getElementById('mainPage');
+        const resultArea = document.getElementById('resultArea');
+        const genBtn = document.getElementById('genBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const qrcodeDiv = document.getElementById('qrcode');
         const displayCount = document.getElementById('displayCount');
 
         genBtn.onclick = async () => {
             genBtn.disabled = true;
-            genBtn.innerText = "Registering Key...";
+            genBtn.innerText = "Registering...";
             errorMsg.classList.add('hidden');
             
             try {
@@ -64,11 +18,16 @@
                 
                 const data = await res.json();
                 currentConfig = data.config;
-                currentCount = data.count; 
+                
+                // Server မှရသော Global Count ကို သုံးခြင်း
+                const serverCount = data.count;
+                displayCount.innerText = serverCount;
 
-                displayCount.innerText = currentCount;
                 qrcodeDiv.innerHTML = "";
-                new QRCode(qrcodeDiv, { text: currentConfig, width: 240, height: 240, colorDark: "#000000", correctLevel: QRCode.CorrectLevel.H });
+                new QRCode(qrcodeDiv, { 
+                    text: currentConfig, width: 240, height: 240, 
+                    colorDark: "#000000", correctLevel: QRCode.CorrectLevel.H 
+                });
 
                 mainPage.classList.add('hidden');
                 resultArea.classList.remove('hidden');
@@ -87,13 +46,16 @@
         };
 
         document.getElementById('dlBtn').onclick = () => {
+            if(!currentConfig) return;
             const blob = new Blob([currentConfig], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            // ဖုန်းတွင် .txt မပါစေရန် application/octet-stream သုံးထားသည်
-            a.download = `Phoenix_${currentCount}.conf`;
+            a.href = url;
+            // ဖိုင်အမည်ကို လက်ရှိ Global Count နံပါတ်ဖြင့် ပေးသည်
+            const countNum = displayCount.innerText;
+            a.download = `Phoenix_${countNum}.conf`;
+            document.body.appendChild(a);
             a.click();
+            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
         };
     </script>
-</body>
-</html>
